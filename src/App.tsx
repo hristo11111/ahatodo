@@ -1,11 +1,18 @@
-import './App.css'
 import Todo from './components/Todo'
+import { todoMachine } from './state/todoMachine'
+import { useActorRef } from '@xstate/react';
+import LoginForm from './components/LoginForm';
+
+import './App.css'
+
 
 function App() {
+  const todoActorRef = useActorRef(todoMachine);
+
   return (
     <>
-      {/* <Login /> */}
-        <Todo />
+      <LoginForm todoActor={todoActorRef} />
+      <Todo todoActor={todoActorRef} />
     </>
   )
 }

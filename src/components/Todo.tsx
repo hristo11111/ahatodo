@@ -1,17 +1,24 @@
 import { todoMachine, Todo } from '../state/todoMachine';
-import { useMachine } from '@xstate/react';
+import { useSelector } from '@xstate/react';
 import { useState } from 'react';
 import { TextField, Button, Checkbox, IconButton, List, ListItemText, ListItemSecondaryAction, ListItemButton, Box } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import { ActorRefFrom } from 'xstate';
+
+interface TodoListProps {
+  todoActor: ActorRefFrom<typeof todoMachine>;
+}
 
 /**
  * React component that displays and manages a list of todos.
  */
-const TodoList = () => {
-  const [state, send] = useMachine(todoMachine);
+const TodoList = ({ todoActor }: TodoListProps) => {
   const [todoInput, setTodoInput] = useState<Todo['text']>('');
   const [editingId, setEditingId] = useState<Todo['id']>('');
+  const isAuthenticated = useSelector(todoActor, (state) => state.context.authenticated);
+  const list = useSelector(todoActor, (state) => state.context.list);
+  const { send } = todoActor;
 
   const handleAddTodo = () => {
     send({ type: 'todo.add', text: todoInput });
@@ -36,6 +43,7 @@ const TodoList = () => {
   };
 
   return (
+    isAuthenticated && 
     <Box>
       <Box display="flex" alignItems="center">
         <TextField
@@ -58,7 +66,7 @@ const TodoList = () => {
         </Button>
       </Box>
       <List>
-        {state.context.list?.map((todo) => (
+        {list.map((todo) => (
           <ListItemButton key={todo.id} >
             <Checkbox checked={todo.completed} onClick={() => handleToggleTodo(todo.id)} />
             {editingId === todo.id ? (

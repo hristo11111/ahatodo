@@ -5,9 +5,14 @@ import { ruruHTML } from "ruru/server";
 import cors from "cors";
 
 const schema = buildSchema(`
-  type Message {
+  type User {
     id: ID!
-    content: String
+    email: String!
+    password: String!
+  }
+
+  type AuthPayload {
+    user: User!
   }
 
   type Todo {
@@ -17,11 +22,12 @@ const schema = buildSchema(`
   }
 
   type Query {
-    getMessage(id: String!): Int
     getTodos: [Todo]
   }
 
   type Mutation {
+    login(email: String!, password: String!): AuthPayload
+    register(email: String!, password: String!): AuthPayload
     addTodo(text: String!): Todo
     toggleTodo(id: ID!): Todo
     updateTodo(id: ID!, text: String!): Todo
@@ -30,10 +36,31 @@ const schema = buildSchema(`
 `);
 
 const fakeDatabase = {
-  todos: []
+  todos: [],
+  users: [{ id: '1', email: 'dad@das.com', password: 'as'}]
 };
 
 const root = {
+  login: ({ email, password }) => {
+    const user = fakeDatabase.users.find(u => u.email === email && u.password === password);
+    if (!user) {
+      throw new Error('Invalid email or password');
+    }
+
+    return { user };
+  },
+  register: ({ email, password }) => {
+    if (fakeDatabase.users.find(u => u.email === email)) {
+      throw new Error('Email already exists');
+    }
+
+    const id = Math.random().toString(36).substring(2, 9);
+
+    const newUser = { id, email, password };
+    fakeDatabase.users.push(newUser);
+
+    return { user: newUser };
+  },
   getTodos: () => fakeDatabase.todos,
   addTodo: ({ text }) => {
     const todo = {
@@ -47,7 +74,7 @@ const root = {
   },
   toggleTodo: ({ id }) => {
     const todoList = [...fakeDatabase.todos];
-    const todo = fakeDatabase.todos.find((t) => t.id === id);
+    const todo = todoList.find((t) => t.id === id);
     todo.completed = !todo.completed;
     fakeDatabase.todos = todoList;
 
@@ -55,7 +82,7 @@ const root = {
   },
   updateTodo: ({ id, text }) => {
     const todoList = [...fakeDatabase.todos];
-    const todo = fakeDatabase.todos.find((t) => t.id === id);
+    const todo = todoList.find((t) => t.id === id);
     todo.text = text;
     fakeDatabase.todos = todoList;
 
@@ -63,8 +90,7 @@ const root = {
   },
   removeTodo: ({ id }) => {
     const todoList = [...fakeDatabase.todos];
-    const todo = fakeDatabase.todos.find((t) => t.id === id);
-
+    const todo = todoList.find((t) => t.id === id);
     fakeDatabase.todos = todoList.filter((t) => t.id !== id);
 
     return todo;

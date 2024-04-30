@@ -1,4 +1,5 @@
-import { setup, assign, fromPromise } from "xstate";
+import { setup, assign, fromPromise, sendTo } from "xstate";
+import { loginMachine } from "./loginMachine";
 
 export interface Todo {
   id: string
@@ -119,12 +120,14 @@ const removeTodo = (id: string) => (
 
 export const todoMachine = setup({
   types: {
-    context: {} as { list: Todo[]; error: string | null },
+    context: {} as { list: Todo[]; error: string | null, authenticated: boolean },
     events: {} as
       | { type: "todo.add", text: string }
       | { type: "todo.toggle", id: string }
       | { type: "todo.update", id: string, text: string, completed: boolean }
       | { type: "todo.remove", id: string }
+      | { type: "login", email: string, password: string }
+      | { type: "addError", error: string }
   },
   schemas: {
     events: {
@@ -184,18 +187,38 @@ export const todoMachine = setup({
 
       return todo;
     }),
+    loginMachine: loginMachine
   },
 }).createMachine({
   context: {
     list: [],
-    error: null
+    error: null,
+    authenticated: false
   },
   id: "todo",
   initial: "initial",
   states: {
     initial: {
-      always: {
-        target: "todosLoading",
+      invoke: {
+        id: 'loginMachine',
+        src: loginMachine,
+        onDone: {
+          actions: assign({ authenticated: true }),
+          target: "todosLoading",
+        },
+        onError: {
+          actions: assign({ error: ({ event }): string | null => event.error as string }),
+        }
+      },
+      on: {
+        login: {
+          actions: sendTo('loginMachine', ({ event }) => {
+            return { type: 'auth.submit', email: event.email, password: event.password };
+          }),
+        },
+        'addError': {
+          actions: assign({ error: ({ event } ) => event.error }),
+        }
       }
     },
     todosLoading: {
