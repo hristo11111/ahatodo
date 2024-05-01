@@ -8,7 +8,9 @@ export const ahaMachine = setup({
       todoChildMachine: ActorRefFrom<typeof todoMachine>,
       loginChildMachine: ActorRefFrom<typeof loginMachine>,
     },
-    events: {} as { type: "auth.success"}
+    events: {} as 
+      | { type: "auth.success" }
+      | { type: "auth.logout" }
   },
   schemas: {
     events: {
@@ -16,6 +18,10 @@ export const ahaMachine = setup({
         type: "object",
         properties: {},
       },
+      "auth.logout": {
+        type: "object",
+        properties: {},
+      }
     },
   },
 }).createMachine({
@@ -34,9 +40,16 @@ export const ahaMachine = setup({
             stopChild('loginChildMachine'),
             sendTo(({ context }) => context.todoChildMachine, { type: 'todo.load' })
           ]
+        },
+      }
+    },
+    todos: {
+      on: {
+        "auth.logout": {
+          target: 'loginForm',
+          actions: stopChild('todoChildMachine')
         }
       }
     },
-    todos: {},
   }
 })

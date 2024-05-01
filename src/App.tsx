@@ -2,6 +2,7 @@ import Todo from './components/Todo'
 import { useMachine } from '@xstate/react';
 import { ahaMachine } from './state/ahaMachine';
 import LoginForm from './components/LoginForm';
+import { Button } from '@mui/material';
 
 import './App.css'
 
@@ -18,7 +19,16 @@ function App() {
       { 
       state.matches('loginForm') 
         ? <LoginForm loginActor={loginActor} />
-        : <Todo todoActor={todoActor} />
+        : <>
+          <Button 
+            variant="contained" 
+            onClick={() => loginActor.send({ type: 'logout' })}
+            sx={{ position: 'absolute', top: 25 }}
+          >
+            Logout
+          </Button>  
+          <Todo todoActor={todoActor} />
+        </>
       }
     </>
   )

@@ -69,6 +69,7 @@ export const loginMachine = setup({
     events: {} as
       | { type: "login", email: Credentials['email'], password: Credentials['password'] }
       | { type: "register", email: Credentials['email'], password: Credentials['password'] }
+      | { type: "logout" }
       | { type: "clearMessage" }
       | { type: "clearError" }
   },
@@ -79,6 +80,10 @@ export const loginMachine = setup({
         properties: {},
       },
       "register": {
+        type: "object",
+        properties: {},
+      },
+      "logout": {
         type: "object",
         properties: {},
       },
@@ -207,7 +212,12 @@ export const loginMachine = setup({
       },
     },
     "Login Successful": {
-      type: "final",
+      on: {
+        logout: {
+          target: "Enter credentials",
+          actions: sendParent(() => ({ type: "auth.logout" }))
+        }
+      }
     },
   },
 });
