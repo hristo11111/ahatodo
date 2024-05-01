@@ -1,7 +1,7 @@
 import { todoMachine, Todo } from '../state/todoMachine';
 import { useSelector } from '@xstate/react';
 import { useState } from 'react';
-import { TextField, Button, Checkbox, IconButton, List, ListItemText, ListItemSecondaryAction, ListItemButton, Box } from '@mui/material';
+import { TextField, Button, Checkbox, IconButton, List, ListItemText, ListItemButton, Box, Grid } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import { ActorRefFrom } from 'xstate';
@@ -12,11 +12,12 @@ interface TodoListProps {
 
 /**
  * React component that displays and manages a list of todos.
+ *  
+ * @param todoActor actor reference
  */
 const TodoList = ({ todoActor }: TodoListProps) => {
   const [todoInput, setTodoInput] = useState<Todo['text']>('');
   const [editingId, setEditingId] = useState<Todo['id']>('');
-  const isAuthenticated = useSelector(todoActor, (state) => state.context.authenticated);
   const list = useSelector(todoActor, (state) => state.context.list);
   const { send } = todoActor;
 
@@ -43,8 +44,7 @@ const TodoList = ({ todoActor }: TodoListProps) => {
   };
 
   return (
-    isAuthenticated && 
-    <Box>
+    <Grid container justifyContent="center">
       <Box display="flex" alignItems="center">
         <TextField
           label="Add Todo"
@@ -56,6 +56,7 @@ const TodoList = ({ todoActor }: TodoListProps) => {
               handleAddTodo();
             }
           }}
+          fullWidth
         />
         <Button 
           variant="contained" 
@@ -65,29 +66,33 @@ const TodoList = ({ todoActor }: TodoListProps) => {
           Add
         </Button>
       </Box>
-      <List>
-        {list.map((todo) => (
-          <ListItemButton key={todo.id} >
-            <Checkbox checked={todo.completed} onClick={() => handleToggleTodo(todo.id)} />
-            {editingId === todo.id ? (
-              <TextField
-                defaultValue={todo.text}
-                onBlur={(e) => handleUpdateTodo(todo.id, todo.completed, e.target.value)}
-                autoFocus
-              />
-            ) : (
-              <ListItemText primary={todo.text} style={{ textDecoration: todo.completed ? 'line-through' : 'none' }} />
-            )}
-            <ListItemSecondaryAction>
-              <IconButton disabled={todo.completed} onClick={() => handleEditTodo(todo.id)}>
-                <EditIcon />
-              </IconButton>
-              <IconButton onClick={() => handleDeleteTodo(todo.id)}><DeleteIcon /></IconButton>
-            </ListItemSecondaryAction>
-          </ListItemButton>
-        ))}
-      </List>
-    </Box>
+      <Grid item xs={12}>
+        <List>
+          {list.map((todo) => (
+            <ListItemButton key={todo.id} >
+              <Checkbox checked={todo.completed} onClick={() => handleToggleTodo(todo.id)} />
+              <Box display="flex" alignItems="center" justifyContent="space-between" flexGrow={1}>
+                {editingId === todo.id ? (
+                  <TextField
+                    defaultValue={todo.text}
+                    onBlur={(e) => handleUpdateTodo(todo.id, todo.completed, e.target.value)}
+                    autoFocus
+                  />
+                ) : (
+                  <ListItemText primary={todo.text} style={{ textDecoration: todo.completed ? 'line-through' : 'none' }} />
+                )}
+                <Box>
+                  <IconButton disabled={todo.completed} onClick={() => handleEditTodo(todo.id)}>
+                    <EditIcon />
+                  </IconButton>
+                  <IconButton onClick={() => handleDeleteTodo(todo.id)}><DeleteIcon /></IconButton>
+                </Box>
+              </Box>
+            </ListItemButton>
+          ))}
+        </List>
+      </Grid>
+    </Grid>
   );
 }
 

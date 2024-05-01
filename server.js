@@ -37,7 +37,7 @@ const schema = buildSchema(`
 
 const fakeDatabase = {
   todos: [],
-  users: [{ id: '1', email: 'dad@das.com', password: 'as'}]
+  users: []
 };
 
 const root = {
@@ -55,7 +55,6 @@ const root = {
     }
 
     const id = Math.random().toString(36).substring(2, 9);
-
     const newUser = { id, email, password };
     fakeDatabase.users.push(newUser);
 

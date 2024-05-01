@@ -1,18 +1,25 @@
 import Todo from './components/Todo'
-import { todoMachine } from './state/todoMachine'
-import { useActorRef } from '@xstate/react';
+import { useMachine } from '@xstate/react';
+import { ahaMachine } from './state/ahaMachine';
 import LoginForm from './components/LoginForm';
 
 import './App.css'
 
-
+/**
+ * React component that renders the login form and todo list.
+ */
 function App() {
-  const todoActorRef = useActorRef(todoMachine);
+  const [state] = useMachine(ahaMachine);
+  const todoActor = state.context.todoChildMachine
+  const loginActor = state.context.loginChildMachine
 
   return (
     <>
-      <LoginForm todoActor={todoActorRef} />
-      <Todo todoActor={todoActorRef} />
+      { 
+      state.matches('loginForm') 
+        ? <LoginForm loginActor={loginActor} />
+        : <Todo todoActor={todoActor} />
+      }
     </>
   )
 }

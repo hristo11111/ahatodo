@@ -1,4 +1,4 @@
-import { setup, assign, fromPromise, sendTo } from "xstate";
+import { setup, assign, fromPromise, AnyEventObject, and } from "xstate";
 import { loginMachine } from "./loginMachine";
 
 export interface Todo {
@@ -120,17 +120,20 @@ const removeTodo = (id: string) => (
 
 export const todoMachine = setup({
   types: {
-    context: {} as { list: Todo[]; error: string | null, authenticated: boolean },
+    context: {} as { list: Todo[]; error: string },
     events: {} as
+      | { type: "todo.load" }
       | { type: "todo.add", text: string }
       | { type: "todo.toggle", id: string }
       | { type: "todo.update", id: string, text: string, completed: boolean }
       | { type: "todo.remove", id: string }
-      | { type: "login", email: string, password: string }
-      | { type: "addError", error: string }
   },
   schemas: {
     events: {
+      "todo.load": {
+        type: "object",
+        properties: {},
+      },
       "todo.add": {
         type: "object",
         properties: {
@@ -159,7 +162,7 @@ export const todoMachine = setup({
           'List of todos',
       },
       error: {
-        type: "string | null",
+        type: "string",
         description:
           'Error message if any',
       },
@@ -167,58 +170,39 @@ export const todoMachine = setup({
   },
   actors: {
     fetchTodos: fromPromise(fetchTodos),
-    addTodo: fromPromise(async ({ input }: { input: Todo['text']}) => {
-      const todo = await addTodo(input);
-      
-      return todo;
-    }),
-    toggleTodo: fromPromise(async ({ input }: { input: Todo['id']}) => {
-      const todo = await toggleTodo(input)
-
-      return todo
-    }),
-    updateTodo: fromPromise(async ({ input: { id, text } }: { input: { id: Todo['id'], text: Todo['text'] }}) => {
-      const todo = await updateTodo(id, text);
-
-      return todo;
-    }),
-    removeTodo: fromPromise(async ({ input }: { input: Todo['id']}) => {
-      const todo = await removeTodo(input);
-
-      return todo;
-    }),
+    addTodo: fromPromise(async ({ input }: { input: Todo['text']}) => (
+      await addTodo(input)
+    )),
+    toggleTodo: fromPromise(async ({ input }: { input: Todo['id']}) => (
+      await toggleTodo(input)
+    )),
+    updateTodo: fromPromise(async ({ input: { id, text } }: { input: { id: Todo['id'], text: Todo['text'] }}) => (
+      await updateTodo(id, text)
+    )),
+    removeTodo: fromPromise(async ({ input }: { input: Todo['id']}) => (
+      await removeTodo(input)
+    )),
     loginMachine: loginMachine
   },
+  actions: {
+    addError: assign({ error: ({ event }: { event: AnyEventObject }) => event.error })
+  },
+  guards: {
+    textRequired: ({ event }: { event: AnyEventObject }) => !!event.text,
+  }
 }).createMachine({
   context: {
     list: [],
-    error: null,
-    authenticated: false
+    error: '',
   },
   id: "todo",
-  initial: "initial",
+  initial: "idle",
   states: {
-    initial: {
-      invoke: {
-        id: 'loginMachine',
-        src: loginMachine,
-        onDone: {
-          actions: assign({ authenticated: true }),
-          target: "todosLoading",
-        },
-        onError: {
-          actions: assign({ error: ({ event }): string | null => event.error as string }),
-        }
-      },
+    idle: {
       on: {
-        login: {
-          actions: sendTo('loginMachine', ({ event }) => {
-            return { type: 'auth.submit', email: event.email, password: event.password };
-          }),
+        'todo.load': {
+          target: 'todosLoading',
         },
-        'addError': {
-          actions: assign({ error: ({ event } ) => event.error }),
-        }
       }
     },
     todosLoading: {
@@ -232,7 +216,7 @@ export const todoMachine = setup({
           } }),
         },
         onError: {
-          actions: assign({ error: ({ event }): string | null => event.error as string }),
+          actions: { type: "addError" },
         },
       }
     },
@@ -240,13 +224,14 @@ export const todoMachine = setup({
       on: {
         "todo.add": {
           target: "addingTodo",
+          guard: { type: "textRequired" }
         },
         "todo.toggle": {
           target: "togglingTodo",
         },
         "todo.update": {
           target: "updatingTodo",
-          guard: ({ event }) => !event.completed
+          guard: and([{ type: "textRequired" }, ({ event }) => !event.completed ])
         },
         "todo.remove": {
           target: "removingTodo",
@@ -266,7 +251,7 @@ export const todoMachine = setup({
         },
         onError: {
           target: 'todosLoaded',
-          actions: assign({ error: ({ event }) => event.error as string }),
+          actions: { type: "addError" },
         },
       }
     },
@@ -292,7 +277,7 @@ export const todoMachine = setup({
         },
         onError: {
           target: 'todosLoaded',
-          actions: assign({ error: ({ event }) => event.error as string }),
+          actions: { type: "addError" },
         },
       }
     },
@@ -318,7 +303,7 @@ export const todoMachine = setup({
         },
         onError: {
           target: 'todosLoaded',
-          actions: assign({ error: ({ event }) => event.error as string }),
+          actions: { type: "addError" },
         },
       }
     },
@@ -335,7 +320,7 @@ export const todoMachine = setup({
         },
         onError: {
           target: 'todosLoaded',
-          actions: assign({ error: ({ event }) => event.error as string }),
+          actions: { type: "addError" },
         },
       }
     },

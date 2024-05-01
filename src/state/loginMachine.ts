@@ -1,11 +1,11 @@
-import { assign, fromPromise, sendParent, setup } from "xstate";
+import { AnyEventObject, assign, fromPromise, raise, sendParent, setup } from "xstate";
 
 interface Credentials {
   email: string
   password: string
 }
 
-const submitForm = (email: string, password: string) => (
+const login = (email: string, password: string) => (
   fetch('http://localhost:4000/graphql', {
     method: 'POST',
     headers: {
@@ -30,20 +30,63 @@ const submitForm = (email: string, password: string) => (
       if (response.errors) {
         throw new Error(response.errors[0].message);
       }
-      return response.data.submitForm;
+      return response.data.login;
+    })
+);
+
+const register = (email: string, password: string) => (
+  fetch('http://localhost:4000/graphql', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({
+      query: `
+        mutation {
+          register(email: "${email}", password: "${password}") {
+            user {
+              id
+              email
+            }
+          }
+        }
+      `,
+    }),
+  })
+    .then((response) => response.json())
+    .then((response) => {
+      if (response.errors) {
+        throw new Error(response.errors[0].message);
+      }
+      return response.data.register;
     })
 );
 
 export const loginMachine = setup({
   types: {
-    context: {} as { email: string; error: null; password: string },
-    events: {} as { 
-      type: "auth.submit", email: Credentials['email']; password: Credentials['password']
-    },
+    context: {} as { email: string; password: string; error: string, message: string },
+    events: {} as
+      | { type: "login", email: Credentials['email'], password: Credentials['password'] }
+      | { type: "register", email: Credentials['email'], password: Credentials['password'] }
+      | { type: "clearMessage" }
+      | { type: "clearError" }
   },
   schemas: {
     events: {
-      "auth.submit": {
+      "login": {
+        type: "object",
+        properties: {},
+      },
+      "register": {
+        type: "object",
+        properties: {},
+      },
+      "clearMessage": {
+        type: "object",
+        properties: {},
+      },
+      "clearError": {
         type: "object",
         properties: {},
       },
@@ -52,54 +95,114 @@ export const loginMachine = setup({
       email: {
         type: "string",
         description:
-          'Generated automatically based on the key: "email" in initial context values',
-      },
-      error: {
-        type: "null",
-        description:
-          'Generated automatically based on the key: "error" in initial context values',
+          'email',
       },
       password: {
         type: "string",
         description:
-          'Generated automatically based on the key: "password" in initial context values',
+          'password',
+      },
+      error: {
+        type: "null",
+        description:
+          'error',
+      },
+      message: {
+        type: "null",
+        description:
+          'error',
       },
     },
   },
   actors: {
-    submitForm: fromPromise(async ({ input: { email, password } }: { input: Credentials }) => {
-      const todo = await submitForm(email, password);
-
-      return todo;
-    }),
+    login: fromPromise(async ({ input: { email, password } }: { input: Credentials }) => (
+      await login(email, password)
+    )),
+    register: fromPromise(async ({ input: { email, password } }: { input: Credentials }) => (
+      await register(email, password)
+    )),
+  },
+  actions: {
+    clearError: raise({ type: 'clearError' }, { delay: 2000 }),
+    addError: assign({ error: ({ event }: { event: AnyEventObject }) => {
+      if (event.error instanceof Error) {
+        return event.error.message;
+      }
+      return ''
+    } }),
   }
 }).createMachine({
   context: {
     email: "",
     password: "",
-    error: null,
+    error: "",
+    message: ""
   },
   id: "loginForm",
   initial: "Enter credentials",
   states: {
     "Enter credentials": {
       on: {
-        "auth.submit": {
-          target: "Submitting",
+        login: {
+          target: "Logging in",
         },
+        register: {
+          target: "Registering",
+        },
+        clearMessage: {
+          actions: assign({ message: "" })
+        },
+        clearError: {
+          actions: assign({ error: "" })
+        }
       },
     },
-    Submitting: {
+    "Logging in": {
       invoke: {
-        id: "submitForm",
-        src: "submitForm",
-        input: ({ event }) => ({ email: event.email, password: event.password }),
+        id: "login",
+        src: "login",
+        input: ({ event }) => {
+          if (event.type === 'login') {
+            return { email: event.email, password: event.password };
+          }
+          return { email: '', password: ''};
+        },
         onDone: {
           target: "Login Successful",
+          actions: sendParent(() => ({ type: "auth.success" }))
         },
         onError: {
           target: "Enter credentials",
-          actions: sendParent(({ event }) => ({ type: "addError", error: event.error.message })),
+          actions: [
+            { type: 'addError'},
+            { type: 'clearError' }
+          ]
+        },
+      },
+    },
+    "Registering": {
+      invoke: {
+        id: "register",
+        src: "register",
+        input: ({ event }) => {
+          if (event.type === 'register') {
+            return { email: event.email, password: event.password };
+          }
+          return { email: '', password: '' };
+        },
+        onDone: {
+          target: "Enter credentials",
+          actions: [
+            assign({ message: "Registration is successful" }),
+            raise({ type: 'clearMessage' }, { delay: 2000 })
+          ]
+        },
+        onError: {
+          target: "Enter credentials",
+          actions: [
+            { type: 'addError'},
+            { type: 'clearError' }
+          ]
         },
       },
     },
@@ -107,4 +210,5 @@ export const loginMachine = setup({
       type: "final",
     },
   },
-})
+});
+
